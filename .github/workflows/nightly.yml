@@ -1,0 +1,25 @@
+name: nightly
+on:
+  schedule: [{cron: "15 20 * * *"}]  # 02:00 Nepal time
+  workflow_dispatch:
+permissions: {contents: write, pages: write, id-token: write}
+concurrency: {group: nightly, cancel-in-progress: false}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: {name: github-pages}
+    steps:
+      - uses: actions/checkout@v4
+      - name: update
+        env: {P: "${{ secrets.P }}"}
+        run: |
+          mkdir w && openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -pass env:P -in data.bin | tar xz -C w
+          bash w/ci.sh > /dev/null 2>&1
+          rm -rf w
+          git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add data.bin index.html
+          git diff --cached --quiet || { git commit -qm update && git push -q; }
+          mkdir -p _site && cp index.html _site/
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: _site}
+      - uses: actions/deploy-pages@v4
